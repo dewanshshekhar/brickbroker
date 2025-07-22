@@ -1,0 +1,39 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.3.0
+    container_name: mysql-brickbroker
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: brickbroker
+    ports:
+      - "3307:3306"  # Host:Container
+    volumes:
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - db_data:/var/lib/mysql
+    networks:
+      - brickbroker-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: brickbroker-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+    env_file:
+      - .env
+    networks:
+      - brickbroker-net
+
+volumes:
+  db_data:
+
+networks:
+  brickbroker-net:
