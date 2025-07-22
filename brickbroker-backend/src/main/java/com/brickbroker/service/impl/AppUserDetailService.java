@@ -2,6 +2,8 @@ package com.brickbroker.service.impl;
 
 
 import com.brickbroker.dto.AgentStatus;
+import com.brickbroker.exception.AgentNotApprovedException;
+import com.brickbroker.exception.UserNotFoundException;
 import com.brickbroker.model.Role;
 import com.brickbroker.model.User;
 import com.brickbroker.repository.UserRepository;
@@ -94,11 +96,11 @@ public class AppUserDetailService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Email not found: " + email));
+                .orElseThrow(() -> new UserNotFoundException("Email not found: " + email));
 
         // Agent approval check
         if (user.getRole() == Role.AGENT && user.getAgentStatus() != AgentStatus.APPROVED) {
-            throw new DisabledException("Your ID is not approved yet");
+            throw new AgentNotApprovedException("Your agent profile is not approved yet by the admin.");
         }
 
         // Grant authorities based on role
@@ -116,7 +118,7 @@ public class AppUserDetailService implements UserDetailsService {
     // For internal use when domain User object is needed
     public User loadDomainUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new UserNotFoundException("User not found with email: " + email));
     }
 }
 

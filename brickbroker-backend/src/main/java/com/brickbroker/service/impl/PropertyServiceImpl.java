@@ -7,8 +7,6 @@ import com.brickbroker.model.*;
 import com.brickbroker.repository.PropertyRepository;
 import com.brickbroker.repository.UserRepository;
 import com.brickbroker.service.PropertyService;
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -20,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -55,15 +52,18 @@ public class PropertyServiceImpl implements PropertyService {
             }
 
             case ADMIN -> {
-                // Admin must provide agentId
-                if (request.getAgentId() == null) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Agent ID must be provided by admin");
-                }
+                if (request.getAgentId() != null) {
+                    // Admin provided agentId → assign to agent
+                    owner = userRepository.findById(request.getAgentId())
+                            .filter(u -> u.getRole() == Role.AGENT)
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valid agent not found"));
 
-                owner = userRepository.findById(request.getAgentId())
-                        .filter(u -> u.getRole() == Role.AGENT)
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Valid agent not found"));
-                log.info("Admin [{}] added property on behalf of agent [{}]", currentEmail, owner.getEmail());
+                    log.info("Admin [{}] added property on behalf of agent [{}]", currentEmail, owner.getEmail());
+                } else {
+                    // No agentId → assign to admin
+                    owner = currentUser;
+                    log.info("Admin [{}] added property and took ownership themselves", currentEmail);
+                }
             }
 
             case OWNER -> {
@@ -120,39 +120,6 @@ public class PropertyServiceImpl implements PropertyService {
         return propertyMapper.toResponse(property);
     }
 
-
-//    @Override
-//    @Transactional
-//    public PropertyResponse addProperty(PropertyRequest request, MultipartFile[] imageFiles) {
-//        Property property = PropertyMapper.toEntity(request);
-//        List<Image> images = new ArrayList<>();
-//
-//        if (imageFiles != null && imageFiles.length > 0) {
-//            if (imageFiles.length > 5) {
-//                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 5 images allowed");
-//            }
-//
-//            for (MultipartFile file : imageFiles) {
-//                if (file.getSize() > 5 * 1024 * 1024) {
-//                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image size must be less than 5MB");
-//                }
-//
-//                Map<String, String> uploadResult = cloudinaryService.uploadFile(file, "brickbroker-properties", "property");
-//
-//                Image image = new Image();
-//                image.setUrl(uploadResult.get("url"));
-//                image.setPublicId(uploadResult.get("public_id"));
-//                image.setProperty(property); // 🔥 link the image to the property
-//
-//                images.add(image);
-//            }
-//        }
-//
-//        property.setImageUrls(images); // set images to property
-//        property = propertyRepository.save(property);
-//
-//        return propertyMapper.toResponse(property);
-//    }
 
     @Override
     public List<PropertyResponse> getAllProperties() {
@@ -218,39 +185,4 @@ public class PropertyServiceImpl implements PropertyService {
                 .collect(Collectors.toList());
     }
 
-
-//    private Map<String, String> uploadFile(MultipartFile file) {
-//        try {
-//            String publicId = "properties/" + UUID.randomUUID();
-//
-//            Map uploadResult = cloudinary.uploader().upload(
-//                    file.getBytes(),
-//                    ObjectUtils.asMap(
-//                            "public_id", publicId,
-//                            "resource_type", "auto",
-//                            "folder", "brickbroker-properties",
-//                            "overwrite", true
-//                    )
-//            );
-//
-//            Map<String, String> result = new HashMap<>();
-//            result.put("url", uploadResult.get("secure_url").toString());
-//            result.put("public_id", uploadResult.get("public_id").toString());
-//            return result;
-//
-//        } catch (IOException e) {
-//            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Image upload failed", e);
-//        }
-//    }
-//
-//    private void deleteFile(String publicId) {
-//        try {
-//            Map result = cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-//            if (!"ok".equals(result.get("result"))) {
-//                throw new IOException("Failed to delete image: " + publicId);
-//            }
-//        } catch (IOException e) {
-//            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to delete image from Cloudinary", e);
-//        }
-//    }
 }

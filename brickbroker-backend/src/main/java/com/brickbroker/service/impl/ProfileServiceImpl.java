@@ -4,6 +4,7 @@ package com.brickbroker.service.impl;
 import com.brickbroker.dto.AgentStatus;
 import com.brickbroker.dto.UserRequest;
 import com.brickbroker.dto.UserResponse;
+import com.brickbroker.exception.*;
 import com.brickbroker.model.Role;
 import com.brickbroker.model.User;
 import com.brickbroker.repository.UserRepository;
@@ -40,7 +41,7 @@ public class ProfileServiceImpl implements ProfileService {
         // Check if email already exists
         if (userRepository.existsByEmail(profileRequest.getEmail())) {
             log.warn("Email already exists: {}", profileRequest.getEmail());
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+            throw new EmailAlreadyExistsException("Email already exists: " + profileRequest.getEmail());
         }
 
         // Convert DTO to entity
@@ -93,7 +94,7 @@ public class ProfileServiceImpl implements ProfileService {
             log.info("Reset OTP sent successfully to: {}", email);
         }catch (Exception e){
             log.error("Failed to send reset OTP email to: {}", email, e);
-            throw  new RuntimeException("Unable to send email");
+            throw  new EmailSendException("Unable to send email to: "+email);
         }
     }
 
@@ -109,7 +110,7 @@ public class ProfileServiceImpl implements ProfileService {
 
         if(existingUser.getResetOtpExpireAt() < System.currentTimeMillis()){
             log.warn("Expired OTP for user: {}", email);
-            throw new RuntimeException("OTP Expired");
+            throw new OtpExpiredException("OTP has expired. Please request a new one.");
         }
 
         existingUser.setPassword(passwordEncoder.encode(newPassword));
@@ -146,7 +147,7 @@ public class ProfileServiceImpl implements ProfileService {
             log.info("Verification OTP sent to: {}", email);
         }catch (Exception e){
             log.error("Failed to send verification OTP to: {}", email, e);
-            throw  new RuntimeException("Unable to send email");
+            throw new EmailSendException("Unable to send email to: " + email);
         }
     }
 
@@ -158,12 +159,12 @@ public class ProfileServiceImpl implements ProfileService {
 
         if (existingUser.getVerifyOtp() == null || !existingUser.getVerifyOtp().equals(otp)) {
             log.warn("Invalid OTP provided for verification by: {}", email);
-            throw new RuntimeException("Invalid OTP");
+            throw new InvalidOtpException("Invalid OTP provided");
         }
 
         if (existingUser.getVerifyOtpExpireAt() < System.currentTimeMillis()) {
             log.warn("OTP expired for user: {}", email);
-            throw new RuntimeException("OTP Expired");
+            throw new OtpExpiredException("OTP has expired. Please request a new one.");
         }
 
         existingUser.setIsAccountVerified(true);
@@ -179,7 +180,7 @@ public class ProfileServiceImpl implements ProfileService {
         log.info("Updating profile picture for: {}", email);
 
         if (profilePicture == null || profilePicture.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile picture file is required");
+            throw new InvalidImageException("Profile picture file is required");
         }
 
         User user = userRepository.findByEmail(email)
